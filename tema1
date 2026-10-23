@@ -1,0 +1,57 @@
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+
+volatile uint8_t ore = 15, minute = 8, secunde = 0;
+volatile bool actualizare = false;
+
+ISR(TIMER1_COMPA_vect) {
+  secunde++;
+  if (secunde >= 60) {
+    secunde = 0;
+    minute++;
+    if (minute >= 60) {
+      minute = 0;
+      ore++;
+      if (ore >= 24) ore = 0;
+    }
+  }
+  actualizare = true;
+}
+
+void setup() {
+  lcd.begin(16, 2);
+  
+  cli();
+  TCCR1A = 0;
+  TCCR1B = 0;
+  TCNT1  = 0;
+  OCR1A  = 15624;
+  TCCR1B |= (1 << WGM12);               
+  TCCR1B |= (1 << CS12) | (1 << CS10); 
+  TIMSK1 |= (1 << OCIE1A);            
+  sei();
+}
+
+void loop() {
+  if (actualizare) {
+    noInterrupts();
+    uint8_t h = ore, m = minute, s = secunde;
+    actualizare = false;
+    interrupts();
+    int valoare = analogRead(A0);
+    float mV = valoare * 5000.0 / 1024.0;
+    //float temperatura = (mV - 500.0) / 10.0;  //pt senzorul TMP36 din simulare
+    float temperatura = mV / 10.0; //pt senzorul LM35
+    
+    lcd.setCursor(0, 0);
+    lcd.print("Temp = ");
+    lcd.print((int)temperatura);              
+    lcd.print("'C   "); //am pus ' in loc de °
+    
+    char linie[17];
+    sprintf(linie, "Ora %02d:%02d:%02d", h, m, s);
+    lcd.setCursor(0, 1);
+    lcd.print(linie);
+  }
+}
